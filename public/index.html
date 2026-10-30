@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeeshan Indexer Pro</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1020;color:#edf4ff;font:15px Arial,sans-serif}
+header{padding:20px;background:#121b2e;border-bottom:1px solid #283751}
+header h1{margin:0;color:#57dfcf}
+header p{color:#9bacc7}
+main{max-width:1100px;margin:auto;padding:16px}
+.panel{background:#121b2e;border:1px solid #283751;border-radius:14px;padding:16px;margin-bottom:16px}
+h2{font-size:19px}
+textarea,input,select{width:100%;padding:12px;margin:7px 0;background:#0b1020;color:white;border:1px solid #394b68;border-radius:8px}
+textarea{height:130px}
+button{padding:11px 14px;border:0;border-radius:8px;background:#57dfcf;color:#071521;font-weight:bold;margin:5px 3px 5px 0}
+.secondary{background:#263550;color:white}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{padding:14px;background:#19263d;border-radius:10px}
+.stat strong{display:block;font-size:25px;margin-top:8px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:600px}
+th,td{text-align:left;padding:10px;border-bottom:1px solid #283751;overflow-wrap:anywhere}
+th{color:#57dfcf}
+a{color:#77aaff}
+.note{font-size:12px;color:#9bacc7;line-height:1.6}
+@media(max-width:500px){.stats{grid-template-columns:1fr}.panel{padding:12px}main{padding:10px}}
+</style>
+</head>
+<body>
+<header>
+<h1>⚡ Zeeshan Indexer Pro</h1>
+<p>Bulk URL Management & SEO Indexing Workspace</p>
+</header>
+
+<main>
+<section class="panel">
+<h2>Add URLs in Bulk</h2>
+<textarea id="urls" placeholder="Paste one URL per line&#10;https://example.com/page-1"></textarea>
+<button onclick="addURLs()">Add URLs</button>
+<button class="secondary" onclick="document.getElementById('file').click()">Import CSV/TXT</button>
+<input type="file" id="file" accept=".csv,.txt" hidden onchange="importFile(event)">
+<p class="note">Add URLs to your local workspace. This tool does not automatically submit pages to Google or confirm indexing.</p>
+</section>
+
+<section class="panel">
+<h2>URL Overview</h2>
+<div class="stats">
+<div class="stat">Total URLs<strong id="total">0</strong></div>
+<div class="stat">Marked Indexed<strong id="indexed">0</strong></div>
+<div class="stat">Needs Review<strong id="review">0</strong></div>
+</div>
+</section>
+
+<section class="panel">
+<h2>Manage URLs</h2>
+<input id="search" placeholder="Search URLs..." oninput="render()">
+<button onclick="exportCSV()">Export CSV Report</button>
+<button class="secondary" onclick="clearAll()">Delete All</button>
+<div class="tablewrap">
+<table>
+<thead>
+<tr><th>URL</th><th>Status</th><th>Actions</th></tr>
+</thead>
+<tbody id="rows"></tbody>
+</table>
+</div>
+<p class="note">The Google Search button opens a search query. Search results are only a rough check and are not definitive proof of indexing.</p>
+</section>
+</main>
+
+<script>
+let urls=[];
+try{
+ urls=JSON.parse(localStorage.getItem('zeeshan_urls')||'[]');
+}catch(e){urls=[];}
+
+function save(){
+ localStorage.setItem('zeeshan_urls',JSON.stringify(urls));
+}
+
+function addURLs(){
+ const text=document.getElementById('urls').value;
+ const parts=text.split(/[\n\r,;]+/);
+ let added=0;
+ for(let raw of parts){
+  let value=raw.trim();
+  if(!value)continue;
+  try{
+   const u=new URL(value);
+   if(u.protocol!=='https:'&&u.protocol!=='http:')continue;
+   if(urls.some(x=>x.url===u.href))continue;
+   urls.unshift({url:u.href,status:'Pending'});
+   added++;
+  }catch(e){}
+ }
+ document.getElementById('urls').value='';
+ save();
+ render();
+ alert(added+' URL(s) added.');
+}
+
+function importFile(event){
+ const file=event.target.files[0];
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=function(){
+  document.getElementById('urls').value=reader.result;
+  addURLs();
+  event.target.value='';
+ };
+ reader.readAsText(file);
+}
+
+function changeStatus(index){
+ const options=['Pending','Indexed','Not indexed','Unknown'];
+ const current=urls[index].status;
+ const next=options[(options.indexOf(current)+1)%options.length];
+ urls[index].status=next;
+ save();
+ render();
+}
+
+function googleSearch(index){
+ const u=urls[index].url;
+ window.open('https://www.google.com/search?q='+encodeURIComponent('site:'+new URL(u).hostname+' '+u),'_blank');
+}
+
+function removeURL(index){
+ urls.splice(index,1);
+ save();
+ render();
+}
+
+function render(){
+ const q=document.getElementById('search').value.toLowerCase();
+ const body=document.getElementById('rows');
+ body.innerHTML='';
+ urls.forEach((item,index)=>{
+  if(!item.url.toLowerCase().includes(q))return;
+  const tr=document.createElement('tr');
+  const td1=document.createElement('td');
+  const link=document.createElement('a');
+  link.href=item.url;
+  link.target='_blank';
+  link.rel='noopener';
+  link.textContent=item.url;
+  td1.appendChild(link);
+
+  const td2=document.createElement('td');
+  td2.textContent=item.status;
+
+  const td3=document.createElement('td');
+  const statusBtn=document.createElement('button');
+  statusBtn.textContent='Change Status';
+  statusBtn.onclick=()=>changeStatus(index);
+
+  const googleBtn=document.createElement('button');
+  googleBtn.textContent='Google Search';
+  googleBtn.className='secondary';
+  googleBtn.onclick=()=>googleSearch(index);
+
+  const deleteBtn=document.createElement('button');
+  deleteBtn.textContent='Delete';
+  deleteBtn.className='secondary';
+  deleteBtn.onclick=()=>removeURL(index);
+
+  td3.append(statusBtn,googleBtn,deleteBtn);
+  tr.append(td1,td2,td3);
+  body.appendChild(tr);
+ });
+
+ document.getElementById('total').textContent=urls.length;
+ document.getElementById('indexed').textContent=urls.filter(x=>x.status==='Indexed').length;
+ document.getElementById('review').textContent=urls.filter(x=>x.status!=='Indexed').length;
+}
+
+function exportCSV(){
+ const rows=[['URL','Status'],...urls.map(x=>[x.url,x.status])];
+ const csv=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='zeeshan-indexer-report.csv';
+ a.click();
+ URL.revokeObjectURL(a.href);
+}
+
+function clearAll(){
+ if(confirm('Delete all saved URLs?')){
+  urls=[];
+  save();
+  render();
+ }
+}
+
+render();
+</script>
+</body>
+</html>
